@@ -1,0 +1,80 @@
+# Sentiment Analysis of Hillary Clinton's Emails
+
+
+## Background
+
+I wrote this code at London kaggle dojo in January 2016.
+
+From kaggle:
+"Throughout 2015, Hillary Clinton has been embroiled in controversy over the use of personal email accounts on non-government servers during her time as the United States Secretary of State. Some political experts and opponents maintain that Clinton's use of personal email accounts to conduct Secretary of State affairs is in violation of protocols and federal laws that ensure appropriate recordkeeping of government activity. Hillary's campaign has provided their own four sentence summary of her email use here.
+
+There have been a number of Freedom of Information lawsuits filed over the State Department's failure to fully release the emails sent and received on Clinton's private accounts. On Monday, August 31, the State Department released nearly 7,000 pages of Clinton's heavily redacted emails (its biggest release of emails to date)."
+
+Presented here is a very simple analysis aimed to begin an exploration of the data.  Possible research questions are still to be developed, but the main aim of this project was to try out a very simple sentiment anlaysis.
+
+## Analysis
+
+Load the SQLite library and connect to our database download, list the tables in it and select all tables.
+```{r}
+library(RSQLite)
+db = dbConnect(SQLite(), dbname="hillary-clinton-emails-release-2015-09-11-01-39-01/output/database.sqlite")
+dbListTables(conn = db)
+emails = dbGetQuery(conn = db, "select * from Emails;")
+
+```
+
+Load the syuzhet package.
+
+```{r}
+library('syuzhet')
+```
+
+
+Get a list of sentiments associated with each email and add the to the data frame.
+```{r}
+d<-get_nrc_sentiment(emails$RawText)
+combined=cbind(emails,d)
+```
+
+I wanted to look at emotions per word so that longer emails wouldn't be given higher scores simply due to the increased amount of content, so wrote a function which use the quick and dirty method of counting spaces to estimate the number of words.
+
+```{r}
+countSpaces <- function(s) { sapply(gregexpr(" ", s), function(p) { sum(p>=0) } ) }
+combined$wordCount = countSpaces(combined$RawText)
+```
+
+Now to examine the emails.  I chose "anger" as a starting sentiment to examine and created "anger per word" scores and added these to the data frame.  Once this was done, I went to look at the angriest email.
+
+```{r}
+combined$anger_per=combined$anger/combined$wordCount
+combined[combined$anger_per==max(combined$anger_per, na.rm=TRUE),]$ExtractedBodyText
+```
+OK, great; that clearly looks like a pretty angry email, so it looks like our approach is reasonable at face value.  Let's survey a few more sentiments or general themes.
+
+Firstly, disgust...
+```{r}
+combined$disgust_per=combined$disgust/combined$wordCount
+combined[combined$disgust_per==max(combined$disgust_per, na.rm=TRUE),]$ExtractedBodyText
+```
+...and now fear...
+```{r}
+combined$fear_per=combined$fear/combined$wordCount
+combined[combined$fear_per==max(combined$fear_per, na.rm=TRUE),]$ExtractedBodyText
+```
+...and now positive sentiment...
+```{r}
+combined$positive_per=combined$positive/combined$wordCount
+combined[combined$positive_per==max(combined$positive_per, na.rm=TRUE),]$ExtractedBodyText
+```
+...and finally negative sentiment.
+```{r}
+combined$negative_per=combined$negative/combined$wordCount
+combined[combined$negative_per==max(combined$negative_per, na.rm=TRUE),]$ExtractedBodyText
+```
+
+Although the first analysis seemed pretty good, the subsequent analyses show that our sentiment analysis perhaps needs some tweaking.  Possible next steps:
+
+* consider at imposing a minimum length on emails examined
+* look more closely at how our sentiment values are calculated and check they represent the data well
+* parse the text more prettily
+
